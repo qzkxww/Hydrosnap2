@@ -11,17 +11,7 @@ import {
   Alert,
   Animated,
 } from 'react-native';
-import { 
-  Search, 
-  Sparkles, 
-  Coffee, 
-  Droplets, 
-  Plus, 
-  X, 
-  Check,
-  AlertCircle,
-  Zap
-} from 'lucide-react-native';
+import { Search, Sparkles, Coffee, Droplets, Plus, X, Check, CircleAlert as AlertCircle, Zap } from 'lucide-react-native';
 
 interface DrinkData {
   name: string;
@@ -301,7 +291,7 @@ export default function SmartDrinkEntry({ visible, onClose, onSave }: SmartDrink
                   autoFocus={true}
                 />
                 {isLoading && (
-                  <ActivityIndicator size="small" color="#0EA5E9" />
+                  <ActivityIndicator size="small\" color="#0EA5E9" />
                 )}
               </View>
             </View>

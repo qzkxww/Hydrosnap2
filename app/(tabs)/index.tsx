@@ -12,17 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  Droplets, 
-  Plus, 
-  Target,
-  Zap,
-  Smile,
-  Edit3,
-  X,
-  Check,
-  Sparkles
-} from 'lucide-react-native';
+import { Droplets, Plus, Target, Zap, Smile, CreditCard as Edit3, X, Check, Sparkles } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import SmartDrinkEntry from '@/components/SmartDrinkEntry';
 import { saveDrinkLog, getTodaysDrinkLogs } from '@/lib/supabase';
