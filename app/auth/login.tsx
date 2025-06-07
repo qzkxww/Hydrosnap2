@@ -178,7 +178,7 @@ export default function LoginScreen() {
                 disabled={loading || googleLoading}
               >
                 {loading ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
+                  <ActivityIndicator size="small\" color="#ffffff" />
                 ) : (
                   <Text style={styles.loginButtonText}>Sign In</Text>
                 )}
@@ -196,7 +196,7 @@ export default function LoginScreen() {
                 disabled={loading || googleLoading}
               >
                 {googleLoading ? (
-                  <ActivityIndicator size="small" color="#1e293b" />
+                  <ActivityIndicator size="small\" color="#1e293b" />
                 ) : (
                   <>
                     <View style={styles.googleIcon}>
