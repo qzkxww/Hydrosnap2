@@ -20,9 +20,12 @@ import {
   Smile,
   Edit3,
   X,
-  Check
+  Check,
+  Sparkles
 } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import SmartDrinkEntry from '@/components/SmartDrinkEntry';
+import { saveDrinkLog, getTodaysDrinkLogs } from '@/lib/supabase';
 
 export default function HomeTab() {
   const [waterIntake, setWaterIntake] = useState(1200);
@@ -30,13 +33,15 @@ export default function HomeTab() {
   const [currentMood, setCurrentMood] = useState<'low' | 'medium' | 'high'>('medium');
   const [energyLevel, setEnergyLevel] = useState<'low' | 'medium' | 'high'>('medium');
   const [showCustomModal, setShowCustomModal] = useState(false);
+  const [showSmartEntry, setShowSmartEntry] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const progressAnimation = useRef(new Animated.Value(0)).current;
-  const circleScaleAnimation = useRef(new Animated.Value(1)).current; // New animation for circle only
+  const circleScaleAnimation = useRef(new Animated.Value(1)).current;
   const headerAnimation = useRef(new Animated.Value(0)).current;
   const progressCardAnimation = useRef(new Animated.Value(0)).current;
   const quickActionsAnimation = useRef(new Animated.Value(0)).current;
@@ -45,7 +50,7 @@ export default function HomeTab() {
 
   // Individual button animations
   const buttonAnimations = useRef(
-    Array.from({ length: 4 }, () => new Animated.Value(0)) // Changed to 4 for the new custom button
+    Array.from({ length: 5 }, () => new Animated.Value(0)) // Updated to 5 for smart entry button
   ).current;
 
   // Mood and energy tracker animations
@@ -54,6 +59,25 @@ export default function HomeTab() {
 
   const progress = Math.min(waterIntake / dailyGoal, 1);
   const remainingWater = Math.max(dailyGoal - waterIntake, 0);
+
+  // Load today's intake on focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadTodaysIntake();
+    }, [])
+  );
+
+  const loadTodaysIntake = async () => {
+    try {
+      const logs = await getTodaysDrinkLogs();
+      const totalIntake = logs.reduce((sum, log) => {
+        return sum + (log.volume_ml * log.hydration_score);
+      }, 0);
+      setWaterIntake(Math.round(totalIntake));
+    } catch (error) {
+      console.error('Error loading today\'s intake:', error);
+    }
+  };
 
   // Trigger animations when tab comes into focus
   useFocusEffect(
@@ -135,7 +159,7 @@ export default function HomeTab() {
           useNativeDriver: true,
         }),
 
-        // Mood and energy tracker animations (staggered) - FASTER
+        // Mood and energy tracker animations (staggered)
         Animated.stagger(80, [
           Animated.spring(moodTrackerAnimation, {
             toValue: 1,
@@ -172,7 +196,7 @@ export default function HomeTab() {
         Animated.delay(80),
         animations[4], // Tracker card
         Animated.delay(50),
-        animations[5], // Mood/Energy trackers - FASTER
+        animations[5], // Mood/Energy trackers
         Animated.delay(50),
         animations[6], // Tips card
       ]).start();
@@ -183,36 +207,56 @@ export default function HomeTab() {
     }, [progress])
   );
 
-  const addWater = (amount: number) => {
-    const newIntake = Math.min(waterIntake + amount, dailyGoal);
-    setWaterIntake(newIntake);
+  const addWater = async (amount: number) => {
+    try {
+      setIsLoading(true);
+      
+      // Save to database
+      await saveDrinkLog({
+        name: 'Water',
+        volume_ml: amount,
+        hydration_score: 1.0,
+        drink_type: 'water',
+        source: 'quick_action'
+      });
 
-    // Animate the progress bar
-    const newProgress = Math.min(newIntake / dailyGoal, 1);
-    
-    // Circle scale animation for feedback (only the circle ring)
-    Animated.sequence([
-      Animated.timing(circleScaleAnimation, {
-        toValue: 1.05,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(circleScaleAnimation, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
+      // Update local state
+      const newIntake = Math.min(waterIntake + amount, dailyGoal);
+      setWaterIntake(newIntake);
 
-    // Progress bar animation
-    Animated.timing(progressAnimation, {
-      toValue: newProgress,
-      duration: 400,
-      useNativeDriver: false,
-    }).start();
+      // Animate the progress bar
+      const newProgress = Math.min(newIntake / dailyGoal, 1);
+      
+      // Circle scale animation for feedback
+      Animated.sequence([
+        Animated.timing(circleScaleAnimation, {
+          toValue: 1.05,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(circleScaleAnimation, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Progress bar animation
+      Animated.timing(progressAnimation, {
+        toValue: newProgress,
+        duration: 400,
+        useNativeDriver: false,
+      }).start();
+
+    } catch (error) {
+      console.error('Error adding water:', error);
+      Alert.alert('Error', 'Failed to save water intake');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleCustomAmount = () => {
+  const handleCustomAmount = async () => {
     const amount = parseInt(customAmount);
     if (isNaN(amount) || amount <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid amount in ml');
@@ -223,15 +267,51 @@ export default function HomeTab() {
       return;
     }
     
-    addWater(amount);
+    await addWater(amount);
     setCustomAmount('');
     setShowCustomModal(false);
+  };
+
+  const handleSmartDrinkSave = async (drinkData: {
+    name: string;
+    volume_ml: number;
+    hydration_score: number;
+    caffeine_mg?: number;
+    drink_type?: string;
+  }) => {
+    try {
+      setIsLoading(true);
+      
+      await saveDrinkLog({
+        ...drinkData,
+        source: 'ai'
+      });
+
+      // Update local state with hydration-adjusted amount
+      const hydrationAdjustedAmount = Math.round(drinkData.volume_ml * drinkData.hydration_score);
+      const newIntake = Math.min(waterIntake + hydrationAdjustedAmount, dailyGoal);
+      setWaterIntake(newIntake);
+
+      // Animate progress
+      const newProgress = Math.min(newIntake / dailyGoal, 1);
+      Animated.timing(progressAnimation, {
+        toValue: newProgress,
+        duration: 400,
+        useNativeDriver: false,
+      }).start();
+
+    } catch (error) {
+      console.error('Error saving smart drink:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleMoodChange = (mood: 'low' | 'medium' | 'high') => {
     setCurrentMood(mood);
     
-    // Animate mood tracker - FASTER
+    // Animate mood tracker
     Animated.sequence([
       Animated.timing(moodTrackerAnimation, {
         toValue: 0.9,
@@ -250,7 +330,7 @@ export default function HomeTab() {
   const handleEnergyChange = (energy: 'low' | 'medium' | 'high') => {
     setEnergyLevel(energy);
     
-    // Animate energy tracker - FASTER
+    // Animate energy tracker
     Animated.sequence([
       Animated.timing(energyTrackerAnimation, {
         toValue: 0.9,
@@ -302,7 +382,11 @@ export default function HomeTab() {
         ],
       }}
     >
-      <TouchableOpacity style={styles.actionButton} onPress={onPress}>
+      <TouchableOpacity 
+        style={styles.actionButton} 
+        onPress={onPress}
+        disabled={isLoading}
+      >
         {children}
       </TouchableOpacity>
     </Animated.View>
@@ -359,7 +443,7 @@ export default function HomeTab() {
           ]}
         >
           <View style={styles.progressRingContainer}>
-            {/* Circular Progress Ring - Only this animates on water addition */}
+            {/* Circular Progress Ring */}
             <Animated.View 
               style={[
                 styles.progressRing,
@@ -373,7 +457,6 @@ export default function HomeTab() {
                 style={styles.progressRingGradient}
               >
                 <View style={styles.progressRingInner}>
-                  {/* Water Icon and Text - Static, no animation */}
                   <View style={styles.progressCenter}>
                     <Droplets size={32} color="#0EA5E9" strokeWidth={2} />
                     <Text style={styles.progressText}>{waterIntake}ml</Text>
@@ -450,6 +533,13 @@ export default function HomeTab() {
               <Edit3 size={20} color="#8b5cf6" strokeWidth={2} />
             </View>
             <Text style={styles.actionText}>Custom</Text>
+          </AnimatedQuickActionButton>
+
+          <AnimatedQuickActionButton index={4} onPress={() => setShowSmartEntry(true)}>
+            <View style={[styles.actionIcon, styles.smartActionIcon]}>
+              <Sparkles size={20} color="#10b981" strokeWidth={2} />
+            </View>
+            <Text style={styles.actionText}>Smart</Text>
           </AnimatedQuickActionButton>
         </Animated.View>
 
@@ -567,7 +657,7 @@ export default function HomeTab() {
             <Text style={styles.tipsTitle}>Today's Tip</Text>
           </View>
           <Text style={styles.tipsText}>
-            Drink a glass of water as soon as you wake up to kickstart your metabolism and rehydrate after sleep.
+            Try the new Smart Drink Entry to log any beverage with AI-powered analysis. Just describe what you're drinking!
           </Text>
         </Animated.View>
 
@@ -615,10 +705,10 @@ export default function HomeTab() {
                 <TouchableOpacity 
                   style={[
                     styles.modalConfirmButton,
-                    !customAmount.trim() && styles.modalConfirmButtonDisabled
+                    (!customAmount.trim() || isLoading) && styles.modalConfirmButtonDisabled
                   ]}
                   onPress={handleCustomAmount}
-                  disabled={!customAmount.trim()}
+                  disabled={!customAmount.trim() || isLoading}
                 >
                   <Check size={20} color="#ffffff" strokeWidth={2} />
                   <Text style={styles.modalConfirmText}>Add Water</Text>
@@ -628,6 +718,13 @@ export default function HomeTab() {
           </View>
         </View>
       </Modal>
+
+      {/* Smart Drink Entry Modal */}
+      <SmartDrinkEntry
+        visible={showSmartEntry}
+        onClose={() => setShowSmartEntry(false)}
+        onSave={handleSmartDrinkSave}
+      />
     </SafeAreaView>
   );
 }
@@ -707,7 +804,6 @@ const styles = StyleSheet.create({
   },
   progressCenter: {
     alignItems: 'center',
-    // Remove any transform or rotation styles
   },
   progressText: {
     fontSize: 24,
@@ -771,6 +867,9 @@ const styles = StyleSheet.create({
   },
   customActionIcon: {
     backgroundColor: '#faf5ff',
+  },
+  smartActionIcon: {
+    backgroundColor: '#f0fdf4',
   },
   actionText: {
     fontSize: 14,
