@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { useFonts } from 'expo-font';
 import {
   Inter_400Regular,
@@ -15,8 +14,6 @@ import { AuthProvider } from '@/contexts/AuthContext';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  useFrameworkReady();
-
   const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Medium': Inter_500Medium,
