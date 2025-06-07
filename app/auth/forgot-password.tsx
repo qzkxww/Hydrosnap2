@@ -169,7 +169,7 @@ export default function ForgotPasswordScreen() {
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
+                  <ActivityIndicator size="small\" color="#ffffff" />
                 ) : (
                   <Text style={styles.resetButtonText}>Send Reset Link</Text>
                 )}
